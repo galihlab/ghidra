@@ -2,30 +2,37 @@ name: Build ARM64 Native Decompiler
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "arm64-build" ]
 
 jobs:
   build-natives:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: NationalSecurityAgency/ghidra
+          ref: Ghidra_12.1.4_build
 
       - name: Install deps
-        run: sudo apt-get update && sudo -S -p '' apt-get install -y g++ make gradle
+        run: sudo apt-get update && sudo -S -p '' apt-get install -y g++ make gradle swig
 
       - name: Build ARM64 natives
         run: |
-          gradle buildNatives_linux_arm_64 --no-daemon -x test -x precommit
-          echo "BUILD_DONE=true" >> $GITHUB_ENV
+          gradle buildNatives_linux_arm_64 --no-daemon -x test -x precommit 2>&1
 
       - name: Package artifact
         run: |
-          # Native libs end up in Ghidra/Features/Decompiler/os/linux_arm_64/
-          find . -path "*/os/linux_arm_64/*.so" -type f
+          echo "=== Finding native .so files ==="
+          find . -type f -name "*.so" -path "*linux_arm_64*" 2>/dev/null
           mkdir -p /tmp/ghidra-arm64-natives
-          find . -path "*/os/linux_arm_64" -type d -exec cp -r {} /tmp/ghidra-arm64-natives/ \;
-          cd /tmp/ghidra-arm64-natives && tar czf /tmp/ghidra-arm64-natives.tar.gz .
+          find . -type d -path "*/os/linux_arm_64" -exec cp -r {} /tmp/ghidra-arm64-natives/ \;
+          if [ -d /tmp/ghidra-arm64-natives/linux_arm_64 ]; then
+            cd /tmp/ghidra-arm64-natives && tar czf /tmp/ghidra-arm64-natives.tar.gz .
+            echo "ARTIFACT_SIZE=$(stat -c%s /tmp/ghidra-arm64-natives.tar.gz)" >> $GITHUB_ENV
+            ls -lh /tmp/ghidra-arm64-natives.tar.gz
+          else
+            echo "No linux_arm_64 natives found"
+            find /tmp/ghidra-arm64-natives -type f
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -19,6 +19,9 @@ jobs:
           distribution: 'temurin'
           java-version: '${{ env.JDK_VER }}'
 
+      - name: Fetch Dependencies
+        run: ./gradlew -I gradle/support/fetchDependencies.gradle -DhideDownloadProgress -DnoEclipse
+
       - name: Build Native ARM64
         run: ./gradlew buildNatives_linux_arm_64 --no-daemon -x test -x precommit
 

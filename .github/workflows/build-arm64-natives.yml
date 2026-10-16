@@ -1,41 +1,41 @@
-name: Build ARM64 Native Decompiler
+name: Build Ghidra Multi-Platform Artifact (Fork)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-natives:
-    runs-on: ubuntu-24.04
+  build:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest]
+
+    runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
         with:
           repository: NationalSecurityAgency/ghidra
           ref: Ghidra_12.1.4_build
 
-      - name: Install deps
-        run: sudo apt-get update && sudo -S -p '' apt-get install -y g++ make gradle swig
+      - name: Read Ghidra JDK Version
+        shell: bash
+        run: echo "JDK_VER=$(awk -F'=' '$1=="application.java.min" {print $2}' Ghidra/application.properties)" >> $GITHUB_ENV
 
-      - name: Build ARM64 natives
-        run: |
-          gradle buildNatives_linux_arm_64 --no-daemon -x test -x precommit 2>&1
-
-      - name: Package artifact
-        run: |
-          echo "=== Finding native .so files ==="
-          find . -type f -name "*.so" -path "*linux_arm_64*" 2>/dev/null
-          mkdir -p /tmp/ghidra-arm64-natives
-          find . -type d -path "*/os/linux_arm_64" -exec cp -r {} /tmp/ghidra-arm64-natives/ \;
-          if [ -d /tmp/ghidra-arm64-natives/linux_arm_64 ]; then
-            cd /tmp/ghidra-arm64-natives && tar czf /tmp/ghidra-arm64-natives.tar.gz .
-            echo "ARTIFACT_SIZE=$(stat -c%s /tmp/ghidra-arm64-natives.tar.gz)" >> $GITHUB_ENV
-            ls -lh /tmp/ghidra-arm64-natives.tar.gz
-          else
-            echo "No linux_arm_64 natives found"
-            find /tmp/ghidra-arm64-natives -type f
-          fi
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Setup JDK
+        uses: actions/setup-java@v5
         with:
-          name: ghidra-arm64-natives
-          path: /tmp/ghidra-arm64-natives.tar.gz
+          distribution: 'temurin'
+          java-version: '${{ env.JDK_VER }}'
+
+      - name: Fetch Dependencies
+        run: ./gradlew -I gradle/support/fetchDependencies.gradle -DhideDownloadProgress -DnoEclipse
+
+      - name: Build Ghidra
+        run: ./gradlew buildGhidra --parallel
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ghidra-linux
+          path: build/dist/ghidra_*.zip

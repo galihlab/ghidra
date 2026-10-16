@@ -25,8 +25,19 @@ jobs:
       - name: Build Native ARM64
         run: ./gradlew buildNatives_linux_arm_64 --no-daemon
 
+      - name: Locate and Collect Natives
+        run: |
+          echo "=== Searching for built native files ==="
+          find . -type f \( -name "decompile" -o -name "sleigh" -o -name "*.so" \) -path "*linux_arm_64*" 2>/dev/null
+          echo "=== build dirs ==="
+          find . -type d -name "linux_arm_64" 2>/dev/null | head -20
+          # Collect everything into a known dir
+          mkdir -p /tmp/natives
+          find . -type f \( -name "decompile" -o -name "sleigh" -o -name "*.so" \) -path "*linux_arm_64*" -exec cp --parents {} /tmp/natives/ \; 2>/dev/null || true
+          ls -laR /tmp/natives | head -50
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: ghidra-arm64-natives
-          path: Ghidra/Features/Decompiler/os/linux_arm_64/
+          path: /tmp/natives/

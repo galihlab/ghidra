@@ -8,14 +8,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Read Ghidra JDK Version
+        shell: bash
+        run: echo "JDK_VER=$(awk -F= '$1==\"application.java.min\" {print $2}' Ghidra/application.properties)" >> $GITHUB_ENV
+
+      - name: Setup JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '${{ env.JDK_VER }}'
+
       - name: Build Native ARM64
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gradle
-          JDK_VER=$(awk -F'=' '$1=="application.java.min" {print $2}' Ghidra/application.properties)
-          echo "JDK: $JDK_VER"
-          sudo apt-get install -y -qq openjdk-$JDK_VER-jdk-headless
-          ./gradlew buildNatives_linux_arm_64 --no-daemon -x test -x precommit
+        run: ./gradlew buildNatives_linux_arm_64 --no-daemon -x test -x precommit
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:

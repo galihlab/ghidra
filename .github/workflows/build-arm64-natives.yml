@@ -1,26 +1,16 @@
-name: Build Ghidra Multi-Platform Artifact (Fork)
+name: Build Ghidra Full (ARM64 Artifact)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-
-    runs-on: ${{ matrix.platform }}
+  build-arm64:
+    runs-on: ubuntu-24.04
     steps:
-
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          repository: NationalSecurityAgency/ghidra
-          ref: Ghidra_12.1.4_build
-
-      - name: Read Ghidra JDK Version
-        shell: bash
-        run: echo "JDK_VER=$(awk -F'=' '$1=="application.java.min" {print $2}' Ghidra/application.properties)" >> $GITHUB_ENV
+      - name: Clone Official Ghidra
+        run: |
+          git clone --depth=1 --branch Ghidra_12.1.4_build https://github.com/NationalSecurityAgency/ghidra.git /tmp/ghidra-src
+          echo "JDK_VER=$(awk -F'=' '$1=="application.java.min" {print $2}' /tmp/ghidra-src/Ghidra/application.properties)" >> $GITHUB_ENV
 
       - name: Setup JDK
         uses: actions/setup-java@v5
@@ -28,14 +18,12 @@ jobs:
           distribution: 'temurin'
           java-version: '${{ env.JDK_VER }}'
 
-      - name: Fetch Dependencies
-        run: ./gradlew -I gradle/support/fetchDependencies.gradle -DhideDownloadProgress -DnoEclipse
-
       - name: Build Ghidra
-        run: ./gradlew buildGhidra --parallel
+        working-directory: /tmp/ghidra-src
+        run: ./gradlew buildGhidra --no-daemon --parallel 2>&1
 
-      - name: Upload Linux Artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ghidra-linux
-          path: build/dist/ghidra_*.zip
+          name: ghidra-linux-full
+          path: /tmp/ghidra-src/build/dist/ghidra_*.zip
